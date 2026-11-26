@@ -578,6 +578,7 @@ function vTrips(){
 const privForm=()=>`<input id="pp" type="password" class="inp" autocomplete="off" placeholder="Passcode" style="text-align:center;margin:12px 0 0"><div class="row"><button class="btn" data-act="privUnlock">Unlock</button></div>`;
 function vPrivate(){
   if(!privOpen){tab='home';return vHome()}
+  if(tripOpen&&isPrivTrip(tripOpen))return vTrips();
   const sh=mShared(month),tot=sum(sh,e=>e.amt);
   const meP=sum(sh.filter(mine),e=>e.amt),pP=tot-meP,B=owed();
   const DB=+S.dateBudget||0;
@@ -598,7 +599,7 @@ function vPrivate(){
   ${st}
   <h3>What we spent on</h3><div class="card">${bars(rows)}</div>
   <h3>Our goals <button data-act="newGoal">+ New goal</button></h3>${goals||'<div class="card note">Saving for something special? Add a goal and both of you can put money towards it.</div>'}
-  <h3>Our trips <button data-act="newTrip">+ New</button></h3>${ptrips.length?ptrips.map(t=>`<button class="card tripc" data-act="openTrip" data-id="${t.id}"><div class="bar-l"><b>🌹 ${esc(t.name)}</b><b>${money(tripTotal(t.id).total)}</b></div></button>`).join(''):'<div class="card note">Trips added here stay hidden from the normal Trips tab.</div>'}
+  <h3>Our trips <span><button data-act="moveTripAsk">Move here</button> <button data-act="newTrip">+ New</button></span></h3>${ptrips.length?ptrips.map(t=>{const tt=tripTotal(t.id);return`<button class="card tripc" data-act="openTrip" data-id="${t.id}"><div class="bar-l"><b style="font-size:16px">🌹 ${esc(t.name)}</b><b>${money(tt.total)}</b></div><div class="lbl">${t.start?dShort(t.start)+(t.end?' – '+dShort(t.end):''):'No dates'}${t.budget?' · budget '+money(t.budget):''}</div>${t.budget?`<div class="bar-t" style="margin-top:8px"><div class="bar-f ${tt.total>t.budget?'over':''}" style="width:${Math.min(100,tt.total/t.budget*100)}%"></div></div>`:''}</button>`}).join(''):'<div class="card note">Trips here are only visible inside 🌹. Create one, or tap “Move here” to bring an existing trip in.</div>'}
   <h3>Sync</h3><div class="card"><div class="note">No server. Sitting together? Use QR: one phone shows, the other scans. Apart? Send the encrypted file on WhatsApp.</div>
   <div class="row"><button class="btn" data-act="qrShow">📱 Show QR</button><button class="btn" data-act="qrScan">📷 Scan QR</button></div>
   <div class="row" style="margin-top:8px"><button class="btn ghost" data-act="exportSync">Send file</button><button class="btn ghost" data-act="importFile">Receive file</button></div></div>
@@ -883,7 +884,7 @@ const ACT={
   search:()=>{searchOn=true;render();scrollTo(0,0);const q=$('#q');q&&q.focus()},searchBack:()=>{searchOn=false;render()},
   sf:el=>{SR[el.dataset.k]=el.dataset.v;toggleIn(el);searchResults()},
   add:()=>{const d=month===curMonth()?todayStr():month+'-01';const acc=defAcc();
-    if(tab==='trips'&&tripOpen){F={form:'tx',type:'expense',cat:'travel',acc,date:todayStr(),amt:'',note:'',tripId:tripOpen,paidBy:S.me,split:'equal'}}
+    if(tripOpen&&(tab==='trips'||tab==='private')){F={form:'tx',type:'expense',cat:'travel',acc,date:todayStr(),amt:'',note:'',tripId:tripOpen,paidBy:S.me,split:'equal'}}
     else if(tab==='private')F={form:'sh',cat:'date',paidBy:S.me,split:'equal',acc,date:d,amt:'',note:''};
     else F={form:'tx',type:'expense',cat:'food',acc,date:d,amt:'',note:''};
     formSheet(true)},
@@ -943,9 +944,11 @@ const ACT={
   saveTrip:el=>{const name=$('#tN').value.trim();if(!name){toast('Give the trip a name');return}
     const v={name,start:$('#tS').value,end:$('#tE').value,budget:parseAmt($('#tB').value),private:!!($('#tP')&&$('#tP').checked),upd:Date.now()};const id=el.dataset.id;
     if(id)Object.assign(S.trips.find(t=>t.id===id),v);else{const t={id:uid(),...v};S.trips.push(t);tripOpen=t.id}
-    save();closeSheet();tab=v.private?'private':'trips';if(v.private)tripOpen=null;render();toast('Trip saved ✓')},
+    save();closeSheet();if(v.private)tab='private';else if(tab==='private'){tab='trips'}render();toast('Trip saved ✓')},
   delTrip:el=>{if(!confirm('Delete this trip? Its expenses stay in your monthly history.'))return;const t=S.trips.find(x=>x.id===el.dataset.id);t.del=true;t.upd=Date.now();tripOpen=null;save();closeSheet();render()},
-  openTrip:el=>{tripOpen=el.dataset.id;tab='trips';render();scrollTo(0,0)},tripBack:()=>{const wasPriv=isPrivTrip(tripOpen);tripOpen=null;if(wasPriv&&privOpen)tab='private';render()},
+  openTrip:el=>{tripOpen=el.dataset.id;if(!(isPrivTrip(tripOpen)&&tab==='private'))tab='trips';render();scrollTo(0,0)},
+  moveTripAsk:()=>{const ts=liveTrips().filter(t=>!t.private);openSheet(`<h2>Move a trip into 🌹</h2><p class="note">It disappears from the normal Trips tab. Its expenses stay in your monthly totals (shown as Misc when locked).</p>${ts.length?ts.map(t=>`<button class="kv" data-act="moveTrip" data-id="${t.id}"><span>🧳 ${esc(t.name)}</span><span class="link">Move</span></button>`).join(''):'<div class="empty">No other trips</div>'}`)},
+  moveTrip:el=>{const t=S.trips.find(x=>x.id===el.dataset.id);t.private=true;t.upd=Date.now();save();closeSheet();render();toast(`${t.name} moved to 🌹`)},tripBack:()=>{tripOpen=null;render()},
   budgets:()=>openSheet(`<h2>Monthly budget</h2><p class="note">Leave blank for no limit.</p>
     ${Object.entries(expCats()).map(([k,[l,i]])=>`<label>${i} ${esc(l)}<input data-b="${k}" inputmode="decimal" value="${S.budgets[k]||''}" placeholder="No limit"></label>`).join('')}
     ${privOpen?`<label>🌹 Us (my share)<input data-b="together" inputmode="decimal" value="${S.budgets.together||''}" placeholder="No limit"></label>`:''}
