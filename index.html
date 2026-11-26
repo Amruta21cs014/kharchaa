@@ -159,7 +159,6 @@ video{width:100%;border-radius:16px;background:#000;max-height:50vh;object-fit:c
   <button class="tab" data-act="tab" data-tab="home"><span>🏠</span>Home</button>
   <button class="tab" data-act="tab" data-tab="history"><span>📊</span>History</button>
   <button class="tab" data-act="tab" data-tab="trips"><span>🧳</span>Trips</button>
-  <button class="tab" data-act="tab" data-tab="together"><span>💑</span>Together</button>
   <button class="tab" data-act="tab" data-tab="more"><span>⚙️</span>More</button>
 </div></nav>
 <div id="sheet"><div id="sheetBody"></div></div>
@@ -391,8 +390,9 @@ function parseReceipt(text){
 const live=()=>S.shared.filter(e=>!e.del);
 const liveGoals=()=>S.goals.filter(g=>!g.del);
 const liveTrips=()=>S.trips.filter(t=>!t.del).sort((a,b)=>(b.start||'').localeCompare(a.start||''));
-/* private space: Together tab + private trips, opened with the couple passcode */
+/* rose space: shared entries + private trips, opened with the passcode */
 let privOpen=false,afterUnlock=null;
+const who=n=>n===S.me?'Me':'Partner';
 const isPrivTrip=id=>{const t=id&&S.trips.find(x=>x.id===id);return!!(t&&t.private)};
 const privTx=t=>isPrivTrip(t.tripId);
 const visTrips=()=>liveTrips().filter(t=>!t.private||privOpen);
@@ -414,12 +414,12 @@ function balance(a){let b=+a.opening||0;
   live().forEach(e=>{if(e.kind!=='settle'&&mine(e)&&e.acc===a.id)b-=e.amt});return b}
 function owed(){let B=0;live().forEach(e=>{if(e.kind==='settle')B+=mine(e)?e.amt:-e.amt;else if(isSpend(e)&&e.split==='equal')B+=mine(e)?e.amt/2:-e.amt/2});return Math.round(B*100)/100}
 const goalSaved=g=>sum(live().filter(e=>e.kind==='goal'&&e.goalId===g.id),e=>e.amt);
-function tripItems(id){return{tx:S.tx.filter(t=>t.tripId===id&&t.type==='expense'),sh:live().filter(e=>isSpend(e)&&e.tripId===id)}}
+function tripItems(id){return{tx:S.tx.filter(t=>t.tripId===id&&t.type==='expense'),sh:privOpen?live().filter(e=>isSpend(e)&&e.tripId===id):[]}}
 function tripTotal(id){const{tx,sh}=tripItems(id);return{total:sum(tx,t=>t.amt)+sum(sh,e=>e.amt),mine:sum(tx,t=>t.amt)+sum(sh,myShare)}}
 function allMonths(){const ms=new Set([curMonth()]);S.tx.forEach(t=>ms.add(t.date.slice(0,7)));live().forEach(e=>ms.add(e.date.slice(0,7)));
   const arr=[...ms].sort();const out=[];let m=arr[0];const end=arr[arr.length-1];while(m<=end){out.push(m);m=shiftMonth(m,1)}return out}
 const tripName=id=>(S.trips.find(t=>t.id===id)||{}).name||'';
-const catLabel=k=>k==='__together'?(privOpen?['Together (my share)','💑']:['Private','🔒']):(expCats()[k]||allCats()[k]||['Other','📦']);
+const catLabel=k=>k==='__together'?(privOpen?['Us (my share)','🌹']:['Misc','📦']):(expCats()[k]||allCats()[k]||['Other','📦']);
 
 /* ---------- recurring entries (#2) ---------- */
 function runRecurring(){let added=0;const cm=curMonth(),td=new Date().getDate();
@@ -471,9 +471,9 @@ function txRow(t){const c=catInfo(t);const cls={income:'pos',saving:'sav',sent:'
   const sub=[t.type==='sent'?'Sent':t.type==='move'?'Moved':c[0],t.type==='move'?accName(t.acc)+' → '+accName(t.toAcc):accName(t.acc),t.tripId?'🧳 '+tripName(t.tripId):'',t.recId?'🔁':'',t.mature?'matures '+dShort(t.mature):''].filter(Boolean).join(' · ');
   return`<button class="item" data-act="editTx" data-id="${t.id}"><div class="ico">${c[1]}</div><div class="mid"><div class="t">${esc(t.note||c[0])}</div><div class="s">${esc(sub)}</div></div><div class="amt ${cls}">${sign}${money(t.amt)}</div></button>`}
 function shRow(e){
-  if(e.kind==='settle')return`<button class="item" data-act="editShared" data-id="${e.id}"><div class="ico">🤝</div><div class="mid"><div class="t">${esc(e.paidBy)} settled up</div><div class="s">Paid back</div></div><div class="amt">${money(e.amt)}</div></button>`;
-  if(e.kind==='goal')return`<button class="item" data-act="editShared" data-id="${e.id}"><div class="ico">🎯</div><div class="mid"><div class="t">${esc((S.goals.find(g=>g.id===e.goalId)||{}).name||'Goal')}</div><div class="s">${esc(e.paidBy)} added</div></div><div class="amt sav">→ ${money(e.amt)}</div></button>`;
-  const c=TCATS[e.cat]||TCATS.other;const sub=`💑 ${e.paidBy} paid · ${e.split==='equal'?'50/50':'treat'}${e.tripId?' · 🧳 '+tripName(e.tripId):''}`;
+  if(e.kind==='settle')return`<button class="item" data-act="editShared" data-id="${e.id}"><div class="ico">🤝</div><div class="mid"><div class="t">${who(e.paidBy)} settled up</div><div class="s">Paid back</div></div><div class="amt">${money(e.amt)}</div></button>`;
+  if(e.kind==='goal')return`<button class="item" data-act="editShared" data-id="${e.id}"><div class="ico">🎯</div><div class="mid"><div class="t">${esc((S.goals.find(g=>g.id===e.goalId)||{}).name||'Goal')}</div><div class="s">${who(e.paidBy)} added</div></div><div class="amt sav">→ ${money(e.amt)}</div></button>`;
+  const c=TCATS[e.cat]||TCATS.other;const sub=`🌹 ${who(e.paidBy)} paid · ${e.split==='equal'?'50/50':'treat'}${e.tripId?' · 🧳 '+tripName(e.tripId):''}`;
   return`<button class="item" data-act="editShared" data-id="${e.id}"><div class="ico">${c[1]}</div><div class="mid"><div class="t">${esc(e.note||c[0])}</div><div class="s">${esc(sub)}</div></div><div class="amt">${money(e.amt)}</div></button>`}
 
 function billsCard(m){if(!S.bills.length)return'';const td=todayStr();
@@ -510,13 +510,14 @@ function vHome(){
   ${sendCard}
   <h3>Where it went <button data-act="budgets">${totB?'Edit budget':'Set budget'}</button></h3><div class="card">${donut(month)}</div>
   <h3>Accounts</h3><div class="card">${accs}<div class="kv"><span class="lbl">Banks + cash</span><b>${money(liquid)}</b></div>${dues?`<div class="kv"><span class="lbl">Card dues</span><b class="neg">${money(dues)}</b></div>`:''}</div>
-  <h3>Entries</h3>${grouped(privOpen?tx:tx.filter(t=>!privTx(t)),txRow)}`;
+  <h3>Entries</h3>${grouped(privOpen?tx:tx.filter(t=>!privTx(t)),txRow)}
+  <div style="text-align:center;margin:26px 0 4px"><button data-act="rose" aria-label="rose" style="border:0;background:none;font-size:22px;opacity:.55;cursor:pointer;padding:10px">🌹</button></div>`;
 }
 function vSearch(){
   const months=[...allMonths()].reverse();
   return `<div class="mnav"><button class="ibtn" data-act="searchBack" aria-label="Back">‹</button><b>Search</b><span style="width:44px"></span></div>
   <input id="q" class="inp" placeholder="Search notes, shops, people…" value="${esc(SR.q)}" autocomplete="off" style="margin:0 0 10px">
-  <div class="chips scroll">${[['all','All'],['expense','Spent'],['sent','Sent'],['saving','Saved'],['income','Got'],['move','Moved'],['together','Together']].map(([k,l])=>`<button class="chip ${SR.type===k?'on':''}" data-act="sf" data-k="type" data-v="${k}">${l}</button>`).join('')}</div>
+  <div class="chips scroll">${[['all','All'],['expense','Spent'],['sent','Sent'],['saving','Saved'],['income','Got'],['move','Moved'],...(privOpen?[['together','🌹']]:[])].map(([k,l])=>`<button class="chip ${SR.type===k?'on':''}" data-act="sf" data-k="type" data-v="${k}">${l}</button>`).join('')}</div>
   <div class="chips scroll" style="margin-top:8px"><button class="chip ${!SR.acc?'on':''}" data-act="sf" data-k="acc" data-v="">Any account</button>${S.accounts.map(a=>`<button class="chip ${SR.acc===a.id?'on':''}" data-act="sf" data-k="acc" data-v="${a.id}">${KIND_ICON[a.kind]} ${esc(a.name)}</button>`).join('')}</div>
   <select id="sm" class="inp" style="margin:10px 0"><option value="">All time</option>${months.map(m=>`<option value="${m}" ${SR.m===m?'selected':''}>${monthLabel(m)}</option>`).join('')}</select>
   <div id="sres"></div>`}
@@ -562,58 +563,57 @@ function vTrips(){
     const{tx,sh}=tripItems(t.id),tt=tripTotal(t.id);
     const rows=Object.entries({...BASE,...customMap()}).map(([k,[l,i]])=>({l,i,v:sum(tx.filter(x=>x.cat===k),x=>x.amt)}));
     Object.entries(TCATS).forEach(([k,[l,i]])=>{const v=sum(sh.filter(e=>e.cat===k),e=>e.amt);if(v){const r=rows.find(r=>r.l===l);r?r.v+=v:rows.push({l,i,v})}});
-    return `<div class="mnav"><button class="ibtn" data-act="tripBack" aria-label="Back">‹</button><b>${t.private?'🔒 ':''}${esc(t.name)}</b><button class="link" data-act="editTrip" data-id="${t.id}">Edit</button></div>
+    return `<div class="mnav"><button class="ibtn" data-act="tripBack" aria-label="Back">‹</button><b>${t.private?'🌹 ':''}${esc(t.name)}</b><button class="link" data-act="editTrip" data-id="${t.id}">Edit</button></div>
     <div class="card hero"><div class="lbl">Trip total${t.start?` · ${dShort(t.start)}${t.end?' – '+dShort(t.end):''}`:''}</div><div class="big">${money(tt.total)}</div>
     ${t.budget?`<div class="bar-l"><span class="lbl">Budget ${money(t.budget)}</span><b>${tt.total>t.budget?`<span class="up">${money(tt.total-t.budget)} over</span>`:money(t.budget-tt.total)+' left'}</b></div><div class="bar-t" style="background:#fff;margin-bottom:12px"><div class="bar-f ${tt.total>t.budget?'over':''}" style="width:${Math.min(100,tt.total/t.budget*100)}%"></div></div>`:''}
     <div class="stats"><div><small>My share</small><b>${money(tt.mine)}</b></div><div><small>Entries</small><b>${tx.length+sh.length}</b></div></div></div>
     <h3>Spent on</h3><div class="card">${bars(rows)}</div>
     <h3>Trip entries</h3>${grouped([...tx.map(x=>({...x,_p:1})),...sh],x=>x._p?txRow(x):shRow(x),'No trip expenses yet. Tap “+ Add”.')}`}
-  const list=visTrips().map(t=>{const tt=tripTotal(t.id);return`<button class="card tripc" data-act="openTrip" data-id="${t.id}"><div class="bar-l"><b style="font-size:16px">${t.private?'🔒':'🧳'} ${esc(t.name)}</b><b>${money(tt.total)}</b></div>
+  const list=visTrips().map(t=>{const tt=tripTotal(t.id);return`<button class="card tripc" data-act="openTrip" data-id="${t.id}"><div class="bar-l"><b style="font-size:16px">${t.private?'🌹':'🧳'} ${esc(t.name)}</b><b>${money(tt.total)}</b></div>
     <div class="lbl">${t.start?dShort(t.start)+(t.end?' – '+dShort(t.end):''):'No dates'}${t.budget?' · budget '+money(t.budget):''}</div>
     ${t.budget?`<div class="bar-t" style="margin-top:8px"><div class="bar-f ${tt.total>t.budget?'over':''}" style="width:${Math.min(100,tt.total/t.budget*100)}%"></div></div>`:''}</button>`}).join('');
-  return `<h1>Trips</h1><div class="row" style="margin:0 0 12px"><button class="btn" data-act="newTrip">+ New trip</button><button class="btn ghost" data-act="${privOpen?'privLock':'privAsk'}">${privOpen?'🔓 Hide private':'🔒 Private trips'}</button></div>
-  ${list||'<div class="card note">Going somewhere? Create a trip, then add expenses to it — just you, or together with your partner. Trip expenses also count in that month’s spending.</div>'}`;
+  return `<h1>Trips</h1><div class="row" style="margin:0 0 12px"><button class="btn" data-act="newTrip">+ New trip</button></div>
+  ${list||'<div class="card note">Going somewhere? Create a trip, then add expenses to it — just you or shared. Trip expenses also count in that month’s spending.</div>'}`;
 }
-function vPrivLock(){return `<h1>Together 💑</h1><div class="card" style="text-align:center;padding:28px 18px"><div style="font-size:44px">🔒</div><h2 style="padding:0;margin:8px 0 4px">Private space</h2><p class="note">Only for ${esc(S.me)} & ${esc(S.partner)}. Enter your couple passcode.</p>${S.pass?privForm():`<p class="note">No couple passcode yet. Choose one together and set the same on both phones.</p><div class="row"><button class="btn" data-act="setPass">Set couple passcode</button></div>`}</div>`}
-const privForm=()=>`<input id="pp" type="password" class="inp" autocomplete="off" placeholder="Couple passcode" style="text-align:center;margin:12px 0 0"><div class="row"><button class="btn" data-act="privUnlock">Unlock</button></div>`;
-function vTogether(){
-  if(!privOpen)return vPrivLock();
+const privForm=()=>`<input id="pp" type="password" class="inp" autocomplete="off" placeholder="Passcode" style="text-align:center;margin:12px 0 0"><div class="row"><button class="btn" data-act="privUnlock">Unlock</button></div>`;
+function vPrivate(){
+  if(!privOpen){tab='home';return vHome()}
   const sh=mShared(month),tot=sum(sh,e=>e.amt);
   const meP=sum(sh.filter(mine),e=>e.amt),pP=tot-meP,B=owed();
   const DB=+S.dateBudget||0;
-  const st=B>0.009?`<div class="card settle owe"><span class="who">${esc(S.partner)} owes you ${money(B)}</span><button class="btn sm" data-act="settle">Settle up</button></div>`
-    :B<-0.009?`<div class="card settle owe"><span class="who">You owe ${esc(S.partner)} ${money(-B)}</span><button class="btn sm" data-act="settle">Settle up</button></div>`
+  const st=B>0.009?`<div class="card settle owe"><span class="who">Partner owes you ${money(B)}</span><button class="btn sm" data-act="settle">Settle up</button></div>`
+    :B<-0.009?`<div class="card settle owe"><span class="who">You owe partner ${money(-B)}</span><button class="btn sm" data-act="settle">Settle up</button></div>`
     :`<div class="card settle ok"><span class="who">All settled 🎉</span></div>`;
   const rows=Object.entries(TCATS).map(([k,[l,i]])=>({l,i,v:sum(sh.filter(e=>e.cat===k),e=>e.amt)}));
   const goals=liveGoals().map(g=>{const s=goalSaved(g),pct=g.target?Math.min(100,s/g.target*100):0;
     return`<div class="card goal"><div class="bar-l"><b style="font-size:15px">${esc(g.name)}${pct>=100?' 🎉':''}</b><button class="btn ghost sm" data-act="addGoal" data-id="${g.id}">+ Add money</button></div>
     <div class="bar-t"><div class="bar-f" style="width:${pct}%"></div></div>
     <div class="bar-l"><span class="lbl">${money(s)} of ${money(g.target)} · ${Math.round(pct)}%</span><button class="link" data-act="editGoal" data-id="${g.id}">Edit</button></div></div>`}).join('');
-  return `<div class="top"><h1>${esc(S.me)} & ${esc(S.partner)} 💑</h1><button class="ibtn" data-act="privLock" aria-label="Lock private space">🔒</button></div>${mnav()}
-  <div class="card hero"><div class="lbl">Spent together</div><div class="big">${money(tot)}</div><div class="cmp">${sh.length} outing${sh.length===1?'':'s'} this month</div>
+  const ptrips=liveTrips().filter(t=>t.private);
+  return `<div class="top"><h1>🌹</h1><div><button class="ibtn" data-act="privSettings" aria-label="Settings">⚙️</button> <button class="ibtn" data-act="privLock" aria-label="Lock">🔒</button></div></div>${mnav()}
+  <div class="card hero"><div class="lbl">Spent</div><div class="big">${money(tot)}</div><div class="cmp">${sh.length} outing${sh.length===1?'':'s'} this month</div>
   ${DB?`<div class="bar-l"><span class="lbl">Date budget ${money(DB)}</span><b>${tot>DB?`<span class="up">${money(tot-DB)} over</span>`:money(DB-tot)+' left'}</b></div><div class="bar-t" style="background:#fff;margin-bottom:12px"><div class="bar-f ${tot>DB?'over':''}" style="width:${Math.min(100,tot/DB*100)}%"></div></div>`:''}
-  <div class="stats"><div><small>${esc(S.me)} paid</small><b>${money(meP)}</b></div><div><small>${esc(S.partner)} paid</small><b>${money(pP)}</b></div></div>
+  <div class="stats"><div><small>Me paid</small><b>${money(meP)}</b></div><div><small>Partner paid</small><b>${money(pP)}</b></div></div>
   <div class="row" style="margin-top:10px"><button class="link" data-act="dateBudget">${DB?'Edit date budget':'+ Set monthly date budget'}</button><button class="link" data-act="yearReview">✨ Year in review</button></div></div>
   ${st}
   <h3>What we spent on</h3><div class="card">${bars(rows)}</div>
   <h3>Our goals <button data-act="newGoal">+ New goal</button></h3>${goals||'<div class="card note">Saving for something special? Add a goal and both of you can put money towards it.</div>'}
-  <h3>Sync with ${esc(S.partner)}</h3><div class="card"><div class="note">No server. Sitting together? Use QR: one phone shows, the other scans. Apart? Send the encrypted file on WhatsApp.</div>
+  <h3>Our trips <button data-act="newTrip">+ New</button></h3>${ptrips.length?ptrips.map(t=>`<button class="card tripc" data-act="openTrip" data-id="${t.id}"><div class="bar-l"><b>🌹 ${esc(t.name)}</b><b>${money(tripTotal(t.id).total)}</b></div></button>`).join(''):'<div class="card note">Trips added here stay hidden from the normal Trips tab.</div>'}
+  <h3>Sync</h3><div class="card"><div class="note">No server. Sitting together? Use QR: one phone shows, the other scans. Apart? Send the encrypted file on WhatsApp.</div>
   <div class="row"><button class="btn" data-act="qrShow">📱 Show QR</button><button class="btn" data-act="qrScan">📷 Scan QR</button></div>
   <div class="row" style="margin-top:8px"><button class="btn ghost" data-act="exportSync">Send file</button><button class="btn ghost" data-act="importFile">Receive file</button></div></div>
   <h3>Our entries</h3>${grouped(live().filter(e=>inM(e,month)),shRow)}`;
 }
 function vMore(){
   return `<h1>Settings</h1>
-  <div class="card"><div class="kv"><span>You</span><b>${esc(S.me)}</b></div><div class="kv"><span>Partner</span><b>${esc(S.partner)}</b></div>
-  <div class="row"><button class="btn ghost" data-act="names">Change names</button></div></div>
+  <div class="card"><div class="kv"><span>Your name</span><b>${esc(S.me)}</b></div><div class="row"><button class="btn ghost" data-act="names">Change name</button></div></div>
   <div class="card"><b>Accounts</b>${S.accounts.map(a=>`<button class="kv" data-act="editAcc" data-id="${a.id}"><span>${KIND_ICON[a.kind]} ${esc(a.name)}${a.last4?` <small class="lbl">··${esc(a.last4)}</small>`:''}</span><span class="link">Edit</span></button>`).join('')}
   <div class="row"><button class="btn ghost" data-act="newAcc">+ Add account / credit card</button></div></div>
   <div class="card"><b>Every month</b>
     <button class="kv" data-act="recurringList"><span>🔁 Repeating entries · ${S.recurring.filter(r=>!r.off).length}</span><span class="link">Manage</span></button>
     <button class="kv" data-act="bills"><span>🧾 Bills & EMIs · ${S.bills.length}</span><span class="link">Manage</span></button>
     <button class="kv" data-act="budgets"><span>🎯 Category budgets</span><span class="link">Edit</span></button>
-    <button class="kv" data-act="sendLimit"><span>💸 Send limit${S.sendLimit?' · '+money(S.sendLimit):''}</span><span class="link">Edit</span></button>
-    <button class="kv" data-act="dateBudget"><span>❤️ Date budget${S.dateBudget?' · '+money(S.dateBudget):''}</span><span class="link">Edit</span></button></div>
+    <button class="kv" data-act="sendLimit"><span>💸 Send limit${S.sendLimit?' · '+money(S.sendLimit):''}</span><span class="link">Edit</span></button></div>
   <div class="card"><b>Categories</b><div class="note" style="margin:4px 0 6px">New ones are created automatically from your notes. Tap to rename or delete.</div>
   ${S.cats.length?S.cats.map(c=>`<button class="kv" data-act="editCat" data-id="${c.id}"><span>${c.icon} ${esc(c.name)}</span><span class="link">Edit</span></button>`).join(''):'<div class="note">No custom categories yet.</div>'}
   <div class="row"><button class="btn ghost" data-act="newCatMore">+ Add category</button></div></div>
@@ -623,7 +623,7 @@ function vMore(){
     <div class="row">${S.pin?'<button class="btn ghost danger" data-act="pinOff">Turn off</button>':''}<button class="btn ghost" data-act="setPin">${S.pin?'Change PIN':'Set PIN'}</button></div>
     <div class="kv" style="margin-top:8px"><span>Face ID / fingerprint</span><span>${S.bio?'On ✓':'Off'}</span></div>
     <div class="row">${S.bio?'<button class="btn ghost danger" data-act="bioOff">Turn off</button>':'<button class="btn ghost" data-act="bioOn">Turn on</button>'}</div>
-    <div class="kv" style="margin-top:8px"><span>Couple passcode <small class="lbl">(Together, private trips, sync)</small></span><span>${S.pass?'Set ✓':'Not set'}</span></div>
+    <div class="kv" style="margin-top:8px"><span>Backup & sync passcode</span><span>${S.pass?'Set ✓':'Not set'}</span></div>
     <div class="row"><button class="btn ghost" data-act="setPass">${S.pass?'Change':'Set'} passcode</button></div></div>
   <div class="card"><b>Backup & Excel</b><div class="note" style="margin-top:4px">Last backup: ${S.lastBackup?dayLabel(ymd(new Date(S.lastBackup))):'never'}. Data lives only on this phone — back up monthly. The Excel file is not encrypted.</div>
   <div class="row"><button class="btn ghost" data-act="backup">Save backup</button><button class="btn ghost" data-act="importFile">Restore</button></div>
@@ -633,9 +633,8 @@ function vMore(){
 }
 function vSetup(){
   const setupAccs=S.accounts.filter(a=>a.kind!=='card');
-  return `<h1>Welcome to Kharcha 💜</h1><p class="note">Private money tracker for two. Set it up once on each phone.</p>
-  <div class="card"><label>Your name<input id="sMe" value="${esc(S.me)}"></label><label>Partner's name<input id="sP" value="${esc(S.partner)}"></label>
-  <div class="row"><button class="btn ghost" data-act="swap">⇄ Swap names (use on ${esc(S.partner)}'s phone)</button></div></div>
+  return `<h1>Welcome to Kharcha 💜</h1><p class="note">Your private money tracker. Everything stays on this phone.</p>
+  <div class="card"><label>Your name<input id="sMe" value="" placeholder="Your name"></label></div>
   <div class="card"><b>Your accounts</b><div class="note">Name your 3 banks and enter today's balances. Credit cards can be added later in More.</div>
   ${setupAccs.map((a,i)=>a.kind==='cash'?`<label>💵 Cash in wallet (₹)<input id="sB${i}" inputmode="decimal" value="${a.opening||''}" placeholder="0"></label>`
     :`<label>Bank ${i+1}<input id="sN${i}" value="${esc(a.name)}" placeholder="e.g. SBI"></label><label>Current balance (₹)<input id="sB${i}" inputmode="decimal" value="${a.opening||''}" placeholder="0"></label>`).join('')}
@@ -644,8 +643,8 @@ function vSetup(){
 }
 function render(){
   const setup=!S.setup;
-  $('#tabs').hidden=setup;$('#fab').hidden=setup||searchOn||!(tab==='home'||(tab==='together'&&privOpen)||(tab==='trips'&&tripOpen));
-  $('#view').innerHTML=setup?vSetup():searchOn?vSearch():({home:vHome,history:vHistory,trips:vTrips,together:vTogether,more:vMore}[tab])();
+  $('#tabs').hidden=setup;$('#fab').hidden=setup||searchOn||!(tab==='home'||(tab==='private'&&privOpen)||(tab==='trips'&&tripOpen));
+  $('#view').innerHTML=setup?vSetup():searchOn?vSearch():({home:vHome,history:vHistory,trips:vTrips,private:vPrivate,more:vMore}[tab])();
   if(searchOn&&!setup)searchResults();
   document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab&&!searchOn));
 }
@@ -669,8 +668,8 @@ function readF(){if(!F)return;const a=$('#fAmt'),d=$('#fDate'),n=$('#fNote'),r=$
 
 function formSheet(focusAmt){
   const isTx=F.form==='tx';
-  const head=F.form==='goal'?`Add to “${esc((S.goals.find(g=>g.id===F.goalId)||{}).name)}”`:(F.id?'Edit':'Add')+(isTx?'':' together');
-  const mode=F.tripId&&!F.id&&F.form!=='goal'?`<div style="margin-bottom:10px">${seg('form',[['tx','Just me'],['sh','Together']],F.form)}</div>`:'';
+  const head=F.form==='goal'?`Add to “${esc((S.goals.find(g=>g.id===F.goalId)||{}).name)}”`:(F.id?'Edit':'Add')+(isTx?'':' 🌹');
+  const mode=F.tripId&&!F.id&&F.form!=='goal'&&privOpen?`<div style="margin-bottom:10px">${seg('form',[['tx','Just me'],['sh','Shared 🌹']],F.form)}</div>`:'';
   const smart=F.form==='goal'?'':smartBox(isTx?'“450 zomato from SBI” or paste SMS':'e.g. “1200 dinner date”');
   openSheet(`<h2>${head}</h2>${mode}${smart}<div id="rest"></div>`);renderRest();
   if(focusAmt&&!F.id){const el=$('#fAmt');el&&el.focus()}}
@@ -698,11 +697,11 @@ function txRest(){
 function shRest(){
   return`${amtBox(F.amt)}<input id="fNote" class="inp" value="${esc(F.note)}" placeholder="What did you do? (e.g. Dinner)" maxlength="80" style="margin-top:10px">
   <div class="sec">Type</div><div class="chips">${chipSet(TCATS,F.cat)}</div>
-  <div class="sec">Who paid?</div>${seg('paidBy',[[S.me,S.me],[S.partner,S.partner]],F.paidBy)}
+  <div class="sec">Who paid?</div>${seg('paidBy',[[S.me,'Me'],[S.partner,'Partner']],F.paidBy)}
   <div class="sec">Split</div>${segQuiet('split',[['equal','50 / 50'],['treat','Treat (no split)']],F.split)}
   ${F.paidBy===S.me?`<div class="sec">Paid from</div><div class="chips">${accChips(F.acc)}</div>`:''}
   ${tripChips(F.tripId)}<div class="sec">When</div>${dateRow(F.date)}${saveRow('saveShared','delShared')}`}
-function goalRest(){return`${amtBox(F.amt)}<div class="sec">Who is adding?</div>${seg('paidBy',[[S.me,S.me],[S.partner,S.partner]],F.paidBy)}
+function goalRest(){return`${amtBox(F.amt)}<div class="sec">Who is adding?</div>${seg('paidBy',[[S.me,'Me'],[S.partner,'Partner']],F.paidBy)}
   ${F.paidBy===S.me?`<div class="sec">From</div><div class="chips">${accChips(F.acc)}</div>`:''}<div class="sec">When</div>${dateRow(F.date)}${saveRow('saveGoalMoney')}`}
 const saveRow=(s,d)=>`<div class="row">${F.id&&d?`<button class="btn ghost danger" style="flex:none" data-act="${d}">Delete</button>`:''}<button class="btn" data-act="${s}">Save</button></div>`;
 
@@ -750,7 +749,7 @@ async function shareFile(name,data,type){const file=new File([data],name,{type:t
   const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);return true}
 const stamp=()=>todayStr().replace(/-/g,'');
 function needPass(){if(!hasCrypto){toast('Open the https link to use encryption');return false}
-  if(!S.pass){toast('Set a couple passcode first (More → Security)');closeSheet();tab='more';searchOn=false;render();return false}return true}
+  if(!S.pass){toast('Set a passcode first (More → Security)');closeSheet();tab='more';searchOn=false;render();return false}return true}
 function mergeList(local,incoming){let n=0;const map=new Map(local.map(e=>[e.id,e]));
   (incoming||[]).forEach(e=>{if(!e||!e.id)return;const cur=map.get(e.id);if(!cur||(e.upd||0)>(cur.upd||0)){map.set(e.id,e);n++}});
   return[[...map.values()],n]}
@@ -765,7 +764,7 @@ async function handleWrapped(w){
     if(data.from===S.me&&!confirm('This came from your own phone. Merge anyway?'))return;
     if(data.from!==S.partner&&data.from!==S.me&&!confirm(`Data is from "${data.from}", but your partner here is "${S.partner}". Names must match on both phones. Merge anyway?`))return;
     let n=0;['shared','goals','trips'].forEach(k=>{const[l,c]=mergeList(S[k],data[k]);S[k]=l;n+=c});
-    save();closeSheet();tab='together';searchOn=false;render();toast(n?`Synced ${n} update${n>1?'s':''} from ${data.from} ✓`:'Already up to date ✓')}
+    save();closeSheet();privOpen=true;tab='private';searchOn=false;render();toast(n?`Synced ${n} update${n>1?'s':''} ✓`:'Already up to date ✓')}
   else if(data.kind==='backup'&&data.state){if(!confirm('Restore this backup? It replaces everything on this phone.'))return;
     S=data.state;migrate();save();render();toast('Backup restored ✓')}
   else toast('Unknown data')}
@@ -777,17 +776,17 @@ function qrStop(){clearInterval(qrTimer);qrTimer=null;if(qrRaf)cancelAnimationFr
 async function gz(str,dir){if(!window.CompressionStream)return null;const cs=dir?new CompressionStream('gzip'):new DecompressionStream('gzip');
   const out=new Response(new Blob([str]).stream().pipeThrough(cs));return dir?new Uint8Array(await out.arrayBuffer()):await out.text()}
 async function qrShow(){if(!needPass())return;
-  openSheet('<h2>Show this to '+esc(S.partner)+'</h2><div class="note">Preparing…</div>');
+  openSheet('<h2>Show this on the other phone</h2><div class="note">Preparing…</div>');
   try{await loadScript('lib/qr/qrcode.js')}catch(e){openSheet('<h2>QR sync</h2><p class="note">QR needs the installed app (https link). Use “Send file” instead.</p>');return}
   const enc=await encrypt(syncPayload(),S.pass);const z=await gz(enc,true);const body=z?'z'+b64(z):'p'+btoa(unescape(encodeURIComponent(enc)));
   const size=400,n=Math.ceil(body.length/size),id=Math.random().toString(36).slice(2,6);
   const frames=Array.from({length:n},(_,i)=>`KQ|${id}|${i}|${n}|${body.slice(i*size,(i+1)*size)}`);
   if(n>90){openSheet('<h2>Too much data for QR</h2><p class="note">Your shared history is large. Use “Send file” on WhatsApp instead.</p>');return}
-  openSheet(`<h2>Show this to ${esc(S.partner)}</h2><p class="note">On ${esc(S.partner)}'s phone: Together → <b>Scan QR</b>. Keep this screen steady${n>1?` — ${n} codes cycle automatically`:''}.</p><div class="qrbox" id="qrImg"></div><div class="hint" id="qrInfo" style="text-align:center"></div>`);
+  openSheet(`<h2>Show this on the other phone</h2><p class="note">On the other phone: 🌹 → <b>Scan QR</b>. Keep this screen steady${n>1?` — ${n} codes cycle automatically`:''}.</p><div class="qrbox" id="qrImg"></div><div class="hint" id="qrInfo" style="text-align:center"></div>`);
   let i=0;const draw=()=>{const q=qrcode(0,'L');q.addData(frames[i]);q.make();$('#qrImg').innerHTML=q.createSvgTag({cellSize:4,margin:4,scalable:true});$('#qrInfo').textContent=n>1?`Code ${i+1} of ${n}`:'';i=(i+1)%n};
   draw();if(n>1)qrTimer=setInterval(()=>{if(!$('#qrImg'))return qrStop();draw()},450)}
 async function qrScan(){
-  openSheet(`<h2>Scan ${esc(S.partner)}'s QR</h2><video id="qrVid" playsinline muted></video><div class="hint" id="qrInfo" style="text-align:center">Starting camera…</div>`);
+  openSheet(`<h2>Scan the other phone's QR</h2><video id="qrVid" playsinline muted></video><div class="hint" id="qrInfo" style="text-align:center">Starting camera…</div>`);
   try{await loadScript('lib/qr/jsQR.js');qrStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})}
   catch(e){$('#qrInfo').textContent='Camera not available. Allow camera access, or use “Receive file”.';return}
   const v=$('#qrVid');v.srcObject=qrStream;await v.play().catch(()=>{});
@@ -807,12 +806,14 @@ async function exportExcel(){
   try{await loadScript('lib/xlsx.full.min.js')}catch(e){toast('Excel needs the installed app (https link)');return}
   const X=XLSX,ms=allMonths(),wb=X.utils.book_new();
   const add=(rows,name,widths)=>{const ws=X.utils.json_to_sheet(rows.length?rows:[{Info:'No data yet'}]);ws['!cols']=widths.map(w=>({wch:w}));X.utils.book_append_sheet(wb,ws,name)};
-  add(ms.map(m=>{const s=monthStats(m);return{Month:monthLabel(m),'Spent (total)':s.spent,'Spent (personal)':s.spentP,'Together (my share)':s.tog,'Sent':s.sent,'Send limit':+S.sendLimit||'','Saved':s.saved,'Received':s.got,'Left':s.left,'Budget':sum(Object.values(S.budgets),v=>+v||0)||''}}),'Monthly summary',[16,14,15,18,10,11,10,11,10,10]);
+  add(ms.map(m=>{const s=monthStats(m);return{Month:monthLabel(m),'Spent (total)':s.spent,'Spent (personal)':s.spentP-(privOpen?0:sum(mTx(m).filter(t=>t.type==='expense'&&privTx(t)),t=>t.amt)),[catLabel('__together')[0]]:s.tog+(privOpen?0:sum(mTx(m).filter(t=>t.type==='expense'&&privTx(t)),t=>t.amt)),'Sent':s.sent,'Send limit':+S.sendLimit||'','Saved':s.saved,'Received':s.got,'Left':s.left,'Budget':sum(Object.values(S.budgets),v=>+v||0)||''}}),'Monthly summary',[16,14,15,18,10,11,10,11,10,10]);
   const cats=Object.entries(expCats());
-  add(cats.map(([k,[l]])=>{const r={Category:l};ms.forEach(m=>r[monthAbbr(m)+' '+m.slice(0,4)]=sum(mTx(m).filter(t=>t.type==='expense'&&t.cat===k),t=>t.amt));return r}).concat([(()=>{const r={Category:'Together (my share)'};ms.forEach(m=>r[monthAbbr(m)+' '+m.slice(0,4)]=monthStats(m).tog);return r})()]),'By category',[22,...ms.map(()=>11)]);
-  add([...S.tx].sort((a,b)=>a.date.localeCompare(b.date)).map(t=>({Date:t.date,Month:monthLabel(t.date.slice(0,7)),Type:TYPE_LBL[t.type],Category:catInfo(t)[0],Account:accName(t.acc),'To account':t.type==='move'?accName(t.toAcc):'',Amount:t.amt,Note:t.note||'',Trip:tripName(t.tripId),Matures:t.mature||'',Repeating:t.recId?'Yes':''})),'All entries',[11,15,10,22,12,12,10,28,14,11,9]);
-  add(live().sort((a,b)=>a.date.localeCompare(b.date)).map(e=>({Date:e.date,What:e.kind==='settle'?'Settle-up':e.kind==='goal'?'Goal: '+((S.goals.find(g=>g.id===e.goalId)||{}).name||''):(e.note||(TCATS[e.cat]||[''])[0]),Category:isSpend(e)?(TCATS[e.cat]||[''])[0]:'','Paid by':e.paidBy,Split:isSpend(e)?(e.split==='equal'?'50/50':'Treat'):'',Amount:e.amt,'My share':myShare(e),Trip:tripName(e.tripId)})),'Together',[11,26,12,12,8,10,10,14]);
-  add(liveTrips().map(t=>{const tt=tripTotal(t.id);return{Trip:t.name,From:t.start||'',To:t.end||'',Budget:t.budget||'','Total spent':tt.total,'My share':tt.mine}}),'Trips',[20,11,11,10,12,10]);
+  const ctm=Object.fromEntries(ms.map(m=>[m,catTotals(m)]));
+  add([...cats,['__together',catLabel('__together')]].map(([k,[l]])=>{const r={Category:l};ms.forEach(m=>r[monthAbbr(m)+' '+m.slice(0,4)]=ctm[m][k]||0);return r}),'By category',[22,...ms.map(()=>11)]);
+  const hid=t=>!privOpen&&privTx(t);
+  add([...S.tx].sort((a,b)=>a.date.localeCompare(b.date)).map(t=>({Date:t.date,Month:monthLabel(t.date.slice(0,7)),Type:TYPE_LBL[t.type],Category:hid(t)?'Misc':catInfo(t)[0],Account:accName(t.acc),'To account':t.type==='move'?accName(t.toAcc):'',Amount:t.amt,Note:hid(t)?'':(t.note||''),Trip:hid(t)?'':tripName(t.tripId),Matures:t.mature||'',Repeating:t.recId?'Yes':''})),'All entries',[11,15,10,22,12,12,10,28,14,11,9]);
+  if(privOpen)add(live().sort((a,b)=>a.date.localeCompare(b.date)).map(e=>({Date:e.date,What:e.kind==='settle'?'Settle-up':e.kind==='goal'?'Goal: '+((S.goals.find(g=>g.id===e.goalId)||{}).name||''):(e.note||(TCATS[e.cat]||[''])[0]),Category:isSpend(e)?(TCATS[e.cat]||[''])[0]:'','Paid by':who(e.paidBy),Split:isSpend(e)?(e.split==='equal'?'50/50':'Treat'):'',Amount:e.amt,'My share':myShare(e),Trip:tripName(e.tripId)})),'Us',[11,26,12,12,8,10,10,14]);
+  add(visTrips().map(t=>{const tt=tripTotal(t.id);return{Trip:t.name,From:t.start||'',To:t.end||'',Budget:t.budget||'','Total spent':tt.total,'My share':tt.mine}}),'Trips',[20,11,11,10,12,10]);
   add(S.accounts.map(a=>({Account:a.name,Type:a.kind,'Last 4':a.last4||'','Starting balance':+a.opening||0,'Balance now':balance(a)})),'Accounts',[16,8,8,16,14]);
   add(S.bills.map(b=>({Bill:b.name,Amount:b.amt,'Due day':b.day,Category:(expCats()[b.cat]||[''])[0],Account:accName(b.acc)})),'Bills & EMIs',[20,10,8,16,12]);
   const out=X.write(wb,{bookType:'xlsx',type:'array'});
@@ -833,14 +834,14 @@ function yearReview(){const y=String(yrView);const ms=allMonths().filter(m=>m.st
   const allCat={};S.tx.filter(t=>t.type==='expense'&&t.date.startsWith(y)).forEach(t=>allCat[t.cat]=(allCat[t.cat]||0)+t.amt);const myTop=Object.entries(allCat).sort((a,b)=>b[1]-a[1])[0];
   const card=(e,l,v)=>`<div class="card" style="background:var(--bg);box-shadow:none;margin-bottom:8px"><div class="lbl">${e} ${l}</div><div class="yr">${v}</div></div>`;
   openSheet(`<div class="mnav" style="margin-right:42px"><button class="ibtn" data-act="yr" data-v="-1" aria-label="Previous year">‹</button><b>✨ ${y} in review</b><button class="ibtn" data-act="yr" data-v="1" aria-label="Next year">›</button></div>
-  <h3 style="margin-top:4px">${esc(S.me)} & ${esc(S.partner)}</h3>
-  ${sh.length?`${card('💑','Spent together',money(tot))}${card('🎉','Outings',sh.length+(busy?` <small class="lbl">· busiest: ${monthShort(busy[0])} (${busy[1]})</small>`:''))}
+  <h3 style="margin-top:4px">🌹 Us</h3>
+  ${sh.length?`${card('🌹','Spent',money(tot))}${card('🎉','Outings',sh.length+(busy?` <small class="lbl">· busiest: ${monthShort(busy[0])} (${busy[1]})</small>`:''))}
   ${topCat?card(TCATS[topCat[0]]?.[1]||'📦','Most on',esc((TCATS[topCat[0]]||['Other'])[0])+` <small class="lbl">${money(topCat[1])}</small>`):''}
   ${fav&&fav[1]>1?card('📍','Favourite',esc(title(fav[0]))+` <small class="lbl">${fav[1]} times</small>`):''}
   ${biggest?card('💎','Biggest treat',money(biggest.amt)+` <small class="lbl">${esc(biggest.note||'')} · ${dShort(biggest.date)}</small>`):''}
-  ${card('🤝','Who paid more',(meP>=tot-meP?esc(S.me):esc(S.partner))+` <small class="lbl">${money(meP)} vs ${money(tot-meP)}</small>`)}
-  ${trips.length?card('🧳','Trips',trips.map(t=>esc(t.name)).join(', ')):''}${goalsDone.length?card('🎯','Goals reached',goalsDone.map(g=>esc(g.name)).join(', ')):''}`:'<div class="card note">No together entries for this year yet.</div>'}
-  <h3>Just ${esc(S.me)}</h3>
+  ${card('🤝','Who paid more',(meP>=tot-meP?'Me':'Partner')+` <small class="lbl">${money(meP)} vs ${money(tot-meP)}</small>`)}
+  ${trips.length?card('🧳','Trips',trips.map(t=>esc(t.name)).join(', ')):''}${goalsDone.length?card('🎯','Goals reached',goalsDone.map(g=>esc(g.name)).join(', ')):''}`:'<div class="card note">No entries for this year yet.</div>'}
+  <h3>Just me</h3>
   ${card('💸','Spent',money(pSpent))}${card('🏦','Saved',money(pSaved))}${card('↗','Sent home',money(pSent))}${card('💼','Received',money(pGot))}
   ${myTop?card(catLabel(myTop[0])[1],'Top category',esc(catLabel(myTop[0])[0])+` <small class="lbl">${money(myTop[1])}</small>`):''}
   ${cheap?card('🌱','Lightest month',monthShort(cheap.m)+` <small class="lbl">${money(cheap.spent)}</small>`):''}`)}
@@ -873,7 +874,7 @@ function accSheet(a,kindNew,nameNew){const kind=a?a.kind:(kindNew||'card');
   <div class="row">${a&&a.id!=='a1'?`<button class="btn ghost danger" style="flex:none" data-act="delAcc" data-id="${a.id}">Delete</button>`:''}<button class="btn" data-act="saveAcc" ${a?`data-id="${a.id}"`:''}>Save</button></div>`);
   F={form:'acc',kind}}
 const ACT={
-  tab:el=>{tab=el.dataset.tab;searchOn=false;if(tab!=='trips')tripOpen=null;render();scrollTo(0,0)},
+  tab:el=>{if(privOpen&&el.dataset.tab!=='trips'){privOpen=false;if(tripOpen&&isPrivTrip(tripOpen))tripOpen=null}tab=el.dataset.tab;searchOn=false;if(tab!=='trips')tripOpen=null;render();scrollTo(0,0)},
   prev:()=>{month=shiftMonth(month,-1);render()},next:()=>{month=shiftMonth(month,1);render()},
   goMonth:el=>{month=el.dataset.m;tab='home';render();scrollTo(0,0)},
   hcat:el=>{histCat=el.dataset.v;render()},
@@ -883,7 +884,7 @@ const ACT={
   sf:el=>{SR[el.dataset.k]=el.dataset.v;toggleIn(el);searchResults()},
   add:()=>{const d=month===curMonth()?todayStr():month+'-01';const acc=defAcc();
     if(tab==='trips'&&tripOpen){F={form:'tx',type:'expense',cat:'travel',acc,date:todayStr(),amt:'',note:'',tripId:tripOpen,paidBy:S.me,split:'equal'}}
-    else if(tab==='together')F={form:'sh',cat:'date',paidBy:S.me,split:'equal',acc,date:d,amt:'',note:''};
+    else if(tab==='private')F={form:'sh',cat:'date',paidBy:S.me,split:'equal',acc,date:d,amt:'',note:''};
     else F={form:'tx',type:'expense',cat:'food',acc,date:d,amt:'',note:''};
     formSheet(true)},
   pick:el=>{F[el.dataset.k]=el.dataset.v;toggleIn(el)},
@@ -940,20 +941,19 @@ const ACT={
     save();closeSheet();render();toast('Added 🎯')},
   newTrip:()=>tripSheet(),editTrip:el=>tripSheet(S.trips.find(t=>t.id===el.dataset.id)),
   saveTrip:el=>{const name=$('#tN').value.trim();if(!name){toast('Give the trip a name');return}
-    const v={name,start:$('#tS').value,end:$('#tE').value,budget:parseAmt($('#tB').value),private:$('#tP').checked,upd:Date.now()};
-    if(v.private&&!S.pass){toast('Set a couple passcode first (More → Security)');return}if(v.private)privOpen=true;const id=el.dataset.id;
+    const v={name,start:$('#tS').value,end:$('#tE').value,budget:parseAmt($('#tB').value),private:!!($('#tP')&&$('#tP').checked),upd:Date.now()};const id=el.dataset.id;
     if(id)Object.assign(S.trips.find(t=>t.id===id),v);else{const t={id:uid(),...v};S.trips.push(t);tripOpen=t.id}
-    save();closeSheet();tab='trips';render();toast('Trip saved ✓')},
+    save();closeSheet();tab=v.private?'private':'trips';if(v.private)tripOpen=null;render();toast('Trip saved ✓')},
   delTrip:el=>{if(!confirm('Delete this trip? Its expenses stay in your monthly history.'))return;const t=S.trips.find(x=>x.id===el.dataset.id);t.del=true;t.upd=Date.now();tripOpen=null;save();closeSheet();render()},
-  openTrip:el=>{tripOpen=el.dataset.id;render();scrollTo(0,0)},tripBack:()=>{tripOpen=null;render()},
+  openTrip:el=>{tripOpen=el.dataset.id;tab='trips';render();scrollTo(0,0)},tripBack:()=>{const wasPriv=isPrivTrip(tripOpen);tripOpen=null;if(wasPriv&&privOpen)tab='private';render()},
   budgets:()=>openSheet(`<h2>Monthly budget</h2><p class="note">Leave blank for no limit.</p>
     ${Object.entries(expCats()).map(([k,[l,i]])=>`<label>${i} ${esc(l)}<input data-b="${k}" inputmode="decimal" value="${S.budgets[k]||''}" placeholder="No limit"></label>`).join('')}
-    <label>💑 Together (my share)<input data-b="together" inputmode="decimal" value="${S.budgets.together||''}" placeholder="No limit"></label>
+    ${privOpen?`<label>🌹 Us (my share)<input data-b="together" inputmode="decimal" value="${S.budgets.together||''}" placeholder="No limit"></label>`:''}
     <div class="row"><button class="btn" data-act="saveBudgets">Save</button></div>`),
-  saveBudgets:()=>{const b={};document.querySelectorAll('[data-b]').forEach(i=>{const v=parseAmt(i.value);if(v>0)b[i.dataset.b]=v});S.budgets=b;save();closeSheet();render();toast('Budget saved ✓')},
+  saveBudgets:()=>{const b=privOpen?{}:{together:S.budgets.together};document.querySelectorAll('[data-b]').forEach(i=>{const v=parseAmt(i.value);if(v>0)b[i.dataset.b]=v});S.budgets=b;save();closeSheet();render();toast('Budget saved ✓')},
   sendLimit:()=>openSheet(`<h2>Monthly send limit</h2><p class="note">How much you plan to send each month (e.g. to home). Home shows how much is left.</p><label>Limit (₹)<input id="sl" inputmode="decimal" value="${S.sendLimit||''}" placeholder="e.g. 10000"></label><div class="row"><button class="btn" data-act="saveSendLimit">Save</button></div>`,'#sl'),
   saveSendLimit:()=>{S.sendLimit=parseAmt($('#sl').value);save();closeSheet();render();toast('Limit saved ✓')},
-  dateBudget:()=>openSheet(`<h2>Monthly date budget</h2><p class="note">How much the two of you plan to spend together each month. Set the same on both phones.</p><label>Budget (₹)<input id="db" inputmode="decimal" value="${S.dateBudget||''}" placeholder="e.g. 5000"></label><div class="row"><button class="btn" data-act="saveDateBudget">Save</button></div>`,'#db'),
+  dateBudget:()=>openSheet(`<h2>🌹 Monthly budget</h2><p class="note">Set the same on both phones.</p><label>Budget (₹)<input id="db" inputmode="decimal" value="${S.dateBudget||''}" placeholder="e.g. 5000"></label><div class="row"><button class="btn" data-act="saveDateBudget">Save</button></div>`,'#db'),
   saveDateBudget:()=>{S.dateBudget=parseAmt($('#db').value);save();closeSheet();render();toast('Date budget saved ✓')},
   yearReview:()=>{yrView=new Date().getFullYear();yearReview()},yr:el=>{yrView+=+el.dataset.v;yearReview()},
   /* recurring (#2) */
@@ -997,15 +997,17 @@ const ACT={
   qrShow:()=>qrShow(),qrScan:()=>qrScan(),
   importFile:()=>{const f=$('#fileIn');f.value='';f.click()},
   backup:async()=>{if(!needPass())return;toast('Encrypting…');const ok=await shareFile(`kharcha-backup-${stamp()}.json`,await encrypt({kind:'backup',state:S},S.pass));if(ok){S.lastBackup=Date.now();save();render()}},
-  excel:()=>{if(!privOpen&&(live().length||S.trips.some(t=>t.private&&!t.del))){afterUnlock=()=>exportExcel().catch(e=>toast('Excel export failed'));ACT.privAsk();return}exportExcel().catch(e=>toast('Excel export failed'))},
-  names:()=>openSheet(`<h2>Names</h2><p class="note">Must match on both phones (your “You” = his “Partner”).</p><label>You<input id="nMe" value="${esc(S.me)}"></label><label>Partner<input id="nP" value="${esc(S.partner)}"></label><div class="row"><button class="btn" data-act="saveNames">Save</button></div>`),
-  saveNames:()=>{const me=$('#nMe').value.trim(),p=$('#nP').value.trim();if(!me||!p||me===p){toast('Enter two different names');return}
+  excel:()=>exportExcel().catch(e=>toast('Excel export failed')),
+  names:()=>openSheet(`<h2>Name</h2><label>Your name<input id="nMe" value="${esc(S.me)}"></label>${privOpen?`<label>Partner's name (must match their name on their phone)<input id="nP" value="${esc(S.partner)}"></label>`:''}<div class="row"><button class="btn" data-act="saveNames">Save</button></div>`),
+  saveNames:()=>{const me=$('#nMe').value.trim(),p=$('#nP')?$('#nP').value.trim():S.partner;if(!me||!p||me===p){toast('Enter two different names');return}
     S.shared.forEach(e=>{if(e.paidBy===S.me)e.paidBy=me;else if(e.paidBy===S.partner)e.paidBy=p});S.me=me;S.partner=p;save();closeSheet();render()},
-  setPass:()=>openSheet(`<h2>Couple passcode</h2><p class="note">Opens the Together tab and private trips, and encrypts sync files and backups. Use the same one on both phones — tell each other in person, not on WhatsApp.</p>${S.pass?'<label>Current passcode<input id="pwOld" type="password" autocomplete="off"></label>':''}<label>New passcode (min 6 characters)<input id="pw" type="password" autocomplete="off"></label><div class="row"><button class="btn" data-act="savePass">Save</button></div>`,S.pass?'#pwOld':'#pw'),
-  savePass:()=>{if(S.pass&&$('#pwOld').value!==S.pass){toast('Current passcode is wrong');return}const v=$('#pw').value;if(v.length<6){toast('At least 6 characters');return}S.pass=v;privOpen=false;save();closeSheet();render();toast('Couple passcode set ✓')},
-  privAsk:()=>{if(!S.pass){ACT.setPass();return}openSheet(`<h2>🔒 Private space</h2><p class="note">Enter your couple passcode.</p>${privForm()}`,'#pp')},
-  privUnlock:()=>{const el=$('#sheet.open #pp')||$('#pp');if(el&&el.value===S.pass){privOpen=true;const f=afterUnlock;afterUnlock=null;closeSheet();render();toast('Unlocked 🔓');if(f)f()}else{toast('Wrong passcode');if(el)el.value=''}},
-  privLock:()=>{privOpen=false;if(tripOpen&&isPrivTrip(tripOpen))tripOpen=null;render();toast('Private space locked 🔒')},
+  setPass:()=>openSheet(`<h2>Passcode</h2><p class="note">Encrypts backups and sync files. Min 6 characters.</p>${S.pass?'<label>Current passcode<input id="pwOld" type="password" autocomplete="off"></label>':''}<label>New passcode (min 6 characters)<input id="pw" type="password" autocomplete="off"></label><div class="row"><button class="btn" data-act="savePass">Save</button></div>`,S.pass?'#pwOld':'#pw'),
+  savePass:()=>{if(S.pass&&$('#pwOld').value!==S.pass){toast('Current passcode is wrong');return}const v=$('#pw').value;if(v.length<6){toast('At least 6 characters');return}S.pass=v;privOpen=false;save();closeSheet();render();toast('Passcode set ✓')},
+  privAsk:()=>{if(!S.pass){ACT.setPass();return}openSheet(`<h2>🌹</h2>${privForm()}`,'#pp')},
+  rose:()=>{if(privOpen){tab='private';render();scrollTo(0,0);return}afterUnlock=()=>{tab='private';render();scrollTo(0,0)};ACT.privAsk()},
+  privSettings:()=>openSheet(`<h2>🌹 Settings</h2><button class="kv" data-act="names"><span>Names (must match on both phones)</span><span class="link">Edit</span></button><button class="kv" data-act="dateBudget"><span>Monthly budget for us${S.dateBudget?' · '+money(S.dateBudget):''}</span><span class="link">Edit</span></button><button class="kv" data-act="setPass"><span>Change passcode</span><span class="link">Edit</span></button><button class="kv" data-act="yearReview"><span>✨ Year in review</span><span class="link">Open</span></button>`),
+  privUnlock:()=>{const el=$('#sheet.open #pp')||$('#pp');if(el&&el.value===S.pass){privOpen=true;const f=afterUnlock;afterUnlock=null;closeSheet();render();if(f)f()}else{toast('Wrong passcode');if(el)el.value=''}},
+  privLock:()=>{privOpen=false;if(tripOpen&&isPrivTrip(tripOpen))tripOpen=null;tab='home';render();scrollTo(0,0)},
   setPin:()=>{if(!hasCrypto){toast('Open the https link to use a PIN');return}openSheet(`<h2>App PIN</h2><label>4–6 digits<input id="pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off"></label><div class="row"><button class="btn" data-act="savePin">Save</button></div>`,'#pin')},
   savePin:async()=>{const v=$('#pin').value;if(!/^\d{4,6}$/.test(v)){toast('Use 4–6 digits');return}const salt=b64(crypto.getRandomValues(new Uint8Array(12)));S.pin={salt,h:await sha(salt+v)};save();closeSheet();render();toast('PIN set ✓')},
   pinOff:()=>{if(S.bio){toast('Turn off Face ID first — PIN is its backup');return}if(!confirm('Turn off the PIN?'))return;S.pin=null;save();render()},
@@ -1020,14 +1022,14 @@ const ACT={
   wipe:()=>{if(!confirm('Delete ALL data on this phone? This cannot be undone.'))return;if(!confirm('Really sure? Save a backup first if unsure.'))return;
     try{localStorage.removeItem(LS)}catch(e){}S=blank();tab='home';render()},
   swap:()=>{const a=$('#sMe').value,b=$('#sP').value;$('#sMe').value=b;$('#sP').value=a},
-  finishSetup:()=>{const me=$('#sMe').value.trim(),p=$('#sP').value.trim();if(!me||!p||me===p){toast('Enter two different names');return}
-    S.me=me;S.partner=p;S.accounts.filter(a=>a.kind!=='card').forEach((a,i)=>{const n=$('#sN'+i);if(n)a.name=n.value.trim()||a.name;a.opening=parseAmt($('#sB'+i).value)});
+  finishSetup:()=>{const me=$('#sMe').value.trim();if(!me){toast('Enter your name');return}
+    if(me.toLowerCase()===S.partner.toLowerCase())S.partner=S.me;S.me=me;S.accounts.filter(a=>a.kind!=='card').forEach((a,i)=>{const n=$('#sN'+i);if(n)a.name=n.value.trim()||a.name;a.opening=parseAmt($('#sB'+i).value)});
     S.sendLimit=parseAmt($('#sL').value);S.setup=true;S.setupAt=Date.now();save();render()}
 };
-function tripSheet(t){openSheet(`<h2>${t?'Edit':'New'} trip</h2><label>Trip name<input id="tN" value="${esc(t?t.name:'')}" placeholder="e.g. Goa, Dec 2026" maxlength="40"></label>
+function tripSheet(t){const defPriv=!t&&tab==='private';openSheet(`<h2>${t?'Edit':'New'} trip</h2><label>Trip name<input id="tN" value="${esc(t?t.name:'')}" placeholder="e.g. Goa, Dec 2026" maxlength="40"></label>
   <div style="display:flex;gap:10px"><label style="flex:1">From<input id="tS" type="date" value="${t?t.start||'':''}"></label><label style="flex:1">To<input id="tE" type="date" value="${t?t.end||'':''}"></label></div>
   <label>Budget (₹, optional)<input id="tB" inputmode="decimal" value="${t&&t.budget?t.budget:''}" placeholder="e.g. 30000"></label>
-  <label class="tog"><input type="checkbox" id="tP" ${t&&t.private?'checked':''}> 🔒 Private trip — hidden until the couple passcode is entered</label>
+  ${privOpen?`<label class="tog"><input type="checkbox" id="tP" ${(t&&t.private)||defPriv?'checked':''}> 🌹 Keep this trip in the rose space</label>`:''}
   <div class="row">${t?`<button class="btn ghost danger" style="flex:none" data-act="delTrip" data-id="${t.id}">Delete</button>`:''}<button class="btn" data-act="saveTrip" ${t?`data-id="${t.id}"`:''}>Save</button></div>`,t?null:'#tN')}
 
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(el&&ACT[el.dataset.act]){e.preventDefault();ACT[el.dataset.act](el,e)}});
